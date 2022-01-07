@@ -1,0 +1,88 @@
+version: "3.8"
+
+services:
+    app:
+        build:
+            args:
+                user: richard
+                uid: 1000
+            context: ./
+            dockerfile: Dockerfile
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
+        image: php8-laravel
+        container_name: php8-laravel
+        restart: unless-stopped
+        working_dir: /var/www/${PROJECT_NAME}/
+        volumes:
+            - ./:/var/www/${PROJECT_NAME}
+            - ./docker-compose/php/conf.d/xdebug.ini:/usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini
+            - ./docker-compose/php/conf.d/error_reporting.ini:/usr/local/etc/php/conf.d/error_reporting.ini
+        networks:
+            - env_php_8
+
+    db:
+        image: mysql:8
+        command: --default-authentication-plugin=mysql_native_password
+        container_name: db
+        restart: unless-stopped
+        environment:
+            MYSQL_DATABASE: ${DB_DATABASE}
+            MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+            MYSQL_PASSWORD: ${DB_PASSWORD}
+            MYSQL_USER: ${DB_USERNAME}
+            SERVICE_TAGS: dev
+            SERVICE_NAME: mysql
+        ports:
+            - 33061:3306
+        networks:
+            - env_php_8
+
+    db-test:
+        image: mysql:8
+        container_name: db-test
+        restart: unless-stopped
+        environment:
+            MYSQL_DATABASE: ${DB_DATABASE_TESTING}
+            MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+            MYSQL_PASSWORD: ${DB_PASSWORD}
+            MYSQL_USER: ${DB_USERNAME}
+            SERVICE_TAGS: dev
+            SERVICE_NAME: mysql-test
+        networks:
+            - env_php_8
+
+    nginx:
+        image: nginx:alpine
+        container_name: nginx
+        restart: unless-stopped
+        ports:
+            - 8000:80
+        volumes:
+            - ./:/var/www/${PROJECT_NAME}
+            - ./docker-compose/nginx:/etc/nginx/conf.d/
+        networks:
+            - env_php_8
+
+    redis:
+        image: redis:6.2.1-buster
+        container_name: redis
+        restart: unless-stopped
+        tty: true
+        volumes:
+            - ./docker-compose/redis/data:/data
+        networks:
+            - env_php_8
+
+    mailhog:
+        image: mailhog/mailhog:v1.0.1
+        container_name: mailhog
+        restart: unless-stopped
+        ports:
+            - 8025:8025
+        networks:
+            - env_php_8
+
+networks:
+    env_php_8:
+        driver: bridge
